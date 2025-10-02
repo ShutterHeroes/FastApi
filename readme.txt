@@ -1,3 +1,20 @@
+# 1) 가상환경 & 설치
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+오류 발생시 pip 업데이트
+
+# 2) 환경변수 (필요 시)
+$env:MODEL_PATH="C:\path\to\best.pt"
+$env:INBOUND_TOKEN="your_inbound_token"  # 백엔드->나 호출 시 Bearer로 검사
+$env:SHARED_SECRET="your_shared_secret"  # 내가 콜백 보낼 때 서명
+
+# 3) 서버 실행 (워커 1개 권장)
+uvicorn server:app --host 0.0.0.0 --port 8000
+
+# 4) 결과값 소수점 변경 (5번째까지만 나오도록 했습니다 )
+_round_floats(out, 5) 이 함수 숫자 바꾸시면됩니다(반올림 안하면 아래처럼나옵니다...)
+
 응답 결과값입니다.
 
 {
