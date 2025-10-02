@@ -99,20 +99,3 @@ async def infer(req: InferIn, authorization: Optional[str] = Header(default=None
 
     asyncio.create_task(_job())
     return Ack(request_id=req.request_id)
-
-# (선택) 운영 편의를 위한 동기 엔드포인트도 함께 두고 싶다면 주석 해제
-# from pydantic import BaseModel
-# class InferSyncOut(BaseModel):
-#     request_id: str
-#     results: List[Dict[str, Any]]
-# @app.post("/infer_sync", response_model=InferSyncOut)
-# async def infer_sync(req: InferIn, authorization: Optional[str] = Header(default=None)):
-#     if INBOUND_TOKEN:
-#         if not authorization or not authorization.startswith("Bearer "):
-#             raise HTTPException(status_code=401, detail="Missing bearer token")
-#         if authorization.split(" ", 1)[1].strip() != INBOUND_TOKEN:
-#             raise HTTPException(status_code=403, detail="Invalid token")
-#     results = await _engine.infer_many(
-#         req.urls, conf=req.conf, iou=req.iou, imgsz=req.imgsz, concurrency=MAX_CONC
-#     )
-#     return {"request_id": req.request_id, "results": results}
