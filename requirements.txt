@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+httpx
+pydantic>=2
+Pillow
+ultralytics
+boto3   # s3:// 경로도 직접 받으려면 (권장은 S3 presigned URL)
+torch    # (CUDA 쓸거면 로컬 환경에 맞는 빌드)
+python-multipart
+opencv-python   # visualize 옵션을 쓸 때만 필요
