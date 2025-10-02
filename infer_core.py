@@ -1,5 +1,3 @@
-# infer_core.py
-import os
 import io
 import asyncio
 from typing import List, Dict, Any, Optional
@@ -9,17 +7,12 @@ import torch
 import httpx
 from ultralytics import YOLO
 
-try:
-    import boto3
-except Exception:
-    boto3 = None
-
 
 class InferenceEngine:
     """
     YOLO 추론 엔진
     - 모델 로드
-    - 이미지 로딩(http/https, s3://, file://, 로컬 경로)
+    - 이미지 로딩(http/https, file://, 로컬 경로)
     - 단건/다건 추론
     - 결과 표준화(detection/classification)
     """
@@ -32,7 +25,6 @@ class InferenceEngine:
         conf: float = 0.25,
         iou: float = 0.45,
         http_timeout: float = 30.0,
-        enable_s3: bool = True,
     ):
         self.model_path = model_path
         self.device = device or ("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -48,9 +40,6 @@ class InferenceEngine:
         # HTTP 클라이언트
         self.http = httpx.AsyncClient(timeout=http_timeout)
 
-        # S3 클라이언트(옵션)
-        self.s3 = boto3.client("s3") if (enable_s3 and boto3 is not None) else None
-
     async def aclose(self):
         try:
             await self.http.aclose()
@@ -63,27 +52,29 @@ class InferenceEngine:
     async def __aexit__(self, exc_type, exc, tb):
         await self.aclose()
 
+    # ---------------- 공용 유틸: float 반올림 ----------------
+    @staticmethod
+    def _round_floats(obj: Any, nd: int = 5) -> Any:
+        """obj 안의 모든 float을 소수점 nd 자리로 반올림해서 반환"""
+        if isinstance(obj, float):
+            return round(obj, nd)
+        if isinstance(obj, list):
+            return [InferenceEngine._round_floats(x, nd) for x in obj]
+        if isinstance(obj, tuple):
+            return [InferenceEngine._round_floats(x, nd) for x in obj]  # tuple도 list로 직렬화
+        if isinstance(obj, dict):
+            return {k: InferenceEngine._round_floats(v, nd) for k, v in obj.items()}
+        return obj
+
     # ---------------- 이미지 로더 ----------------
     async def _load_image(self, src: str) -> Image.Image:
         """
-        src: http(s)://, s3://bucket/key, file://path, 혹은 로컬 경로
+        src: http(s)://, file://path, 혹은 로컬 경로
         """
         # file:// 또는 로컬 경로
-        if src.startswith("file://") or (not src.startswith("http") and not src.startswith("s3://")):
+        if src.startswith("file://") or (not src.startswith("http")):
             path = src[7:] if src.startswith("file://") else src
             return Image.open(path).convert("RGB")
-
-        # s3://bucket/key
-        if src.startswith("s3://"):
-            if not self.s3:
-                raise RuntimeError("boto3/s3 client is not available. Set enable_s3=True and install boto3.")
-            def _get_from_s3() -> bytes:
-                bucket_key = src[5:]
-                bucket, key = bucket_key.split("/", 1)
-                obj = self.s3.get_object(Bucket=bucket, Key=key)
-                return obj["Body"].read()
-            data = await asyncio.to_thread(_get_from_s3)
-            return Image.open(io.BytesIO(data)).convert("RGB")
 
         # http/https
         resp = await self.http.get(src)
@@ -113,7 +104,7 @@ class InferenceEngine:
         # ----- classification -----
         probs = getattr(res, "probs", None)
         if probs is not None:
-            # top-5 (ID는 preds에서만 사용하고, probs에는 포함하지 않음)
+            # top-5 (ID는 preds에서만 사용)
             try:
                 top5 = [int(c) for c in getattr(probs, "top5", [])]
             except Exception:
@@ -132,17 +123,16 @@ class InferenceEngine:
                 for c, s in zip(top5, top5conf)
             ]
 
-            return (
-                {
-                    "task": "classification",
-                    "speed_ms": speed,
-                    "probs": {
-                        # 요청대로 data/top5는 제외
-                        "top5conf": top5conf,
-                    },
-                    "preds": preds,  # 사람이 보기 좋은 Top-5 (라벨 포함)
-                }
-            )
+            out = {
+                "task": "classification",
+                "speed_ms": speed,
+                "probs": {
+                    # 요청대로 data/top5는 제외, top5conf만 남김
+                    "top5conf": top5conf,
+                },
+                "preds": preds,  # 사람이 보기 좋은 Top-5 (라벨 포함)
+            }
+            return self._round_floats(out, 5)
 
         # ----- detection -----
         boxes = getattr(res, "boxes", None)
@@ -157,28 +147,26 @@ class InferenceEngine:
                 score = float(confs[i]) if i < len(confs) else None
                 dets.append(
                     {
-                        "bbox_xyxy": box,
+                        "bbox_xyxy": box,  # 나중에 일괄 반올림
                         "score": score,
                         "class_id": cid,
                         "label": self._label_from_names(names, cid),
                     }
                 )
 
-            return (
-                {
-                    "task": "detection",
-                    "speed_ms": speed,
-                    "detections": dets,
-                }
-            )
+            out = {
+                "task": "detection",
+                "speed_ms": speed,
+                "detections": dets,
+            }
+            return self._round_floats(out, 5)
 
         # ----- unknown -----
-        return (
-            {
-                "task": "unknown",
-                "speed_ms": speed,
-            }
-        )
+        out = {
+            "task": "unknown",
+            "speed_ms": speed,
+        }
+        return self._round_floats(out, 5)
 
     # ---------------- 단건/다건 추론 ----------------
     async def infer_one(
@@ -204,12 +192,10 @@ class InferenceEngine:
 
         results = await asyncio.to_thread(_predict)
         res0 = results[0]
-        return (
-            {
-                "source": src,
-                "result": self._result_to_dict(res0),
-            }
-        )
+        return {
+            "source": src,
+            "result": self._result_to_dict(res0),
+        }
 
     async def infer_many(
         self,
