@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  yolo-inference:
+    image: ${FASTAPI_ECR_REGISTRY}/${FASTAPI_ECR_REPOSITORY}:${FASTAPI_IMAGE_TAG:-latest}
+    container_name: yolo-fastapi
+    ports:
+      - "8000:8000"
+    environment:
+      # 모델 설정
+      - MODEL_PATH=${MODEL_PATH:-best.pt}
+      - DEVICE=${DEVICE:-cpu}
+      - IMGSZ=${IMGSZ:-640}
+      - CONF=${CONF:-0.25}
+      - IOU=${IOU:-0.45}
+
+      # 동시성 제어
+      - MAX_INFLIGHT=${MAX_INFLIGHT:-2}
+
+      # 인증 (옵션)
+      - INBOUND_TOKEN=${INBOUND_TOKEN:-}
+      - SHARED_SECRET=${SHARED_SECRET:-}
+
+      # AWS (S3 사용 시)
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ap-northeast-2}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+
+      # 기타 설정
+      - POST_TIMEOUT=${POST_TIMEOUT:-60}
+
+    # 볼륨 마운트 (옵션 - 모델 파일을 외부에서 관리할 경우)
+    # volumes:
+    #   - ./best.pt:/app/best.pt:ro
+    #   - ./logs:/app/logs
+
+    restart: unless-stopped
+
+    # 헬스체크
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # 네트워크 설정 (다른 서비스와 통신 시)
+    # networks:
+    #   - app-network
+
+# GPU 버전 사용 시 주석 해제
+# (nvidia-docker 및 docker-compose v1.28+ 필요)
+#   yolo-inference-gpu:
+#     build:
+#       context: .
+#       dockerfile: Dockerfile.gpu
+#     container_name: yolo-fastapi-gpu
+#     ports:
+#       - "8001:8000"
+#     environment:
+#       - MODEL_PATH=${MODEL_PATH:-best.pt}
+#       - DEVICE=cuda:0
+#       # ... (위와 동일한 환경 변수)
+#     deploy:
+#       resources:
+#         reservations:
+#           devices:
+#             - driver: nvidia
+#               count: 1
+#               capabilities: [gpu]
+#     restart: unless-stopped
+
+# 네트워크 정의 (필요 시)
+# networks:
+#   app-network:
+#     external: true
+#     # 또는
+#     # driver: bridge
