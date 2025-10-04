@@ -1,0 +1,18 @@
+# Docker 최적화 버전 - CPU 전용
+fastapi
+uvicorn[standard]
+httpx
+pydantic>=2
+Pillow
+# PyTorch CPU 버전만 설치 (CUDA 제외)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
+# OpenCV headless 버전 (GUI 없음, 더 가벼움)
+opencv-python-headless
+# Ultralytics (torch는 위에서 이미 설치)
+ultralytics
+# AWS S3
+boto3
+python-multipart
+python-dotenv
