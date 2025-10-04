@@ -58,6 +58,10 @@ class Ack(BaseModel):
     request_id: str
     status: str = "accepted"
 
+class InferSyncOut(BaseModel):
+    request_id: str
+    results: List[Dict[str, Any]]
+
 # ---------- 유틸: 콜백 전송 ----------
 async def send_callback(url: str, payload: Dict[str, Any], max_retry: int = 3):
     headers = {"Content-Type": "application/json"}
@@ -99,3 +103,18 @@ async def infer(req: InferIn, authorization: Optional[str] = Header(default=None
 
     asyncio.create_task(_job())
     return Ack(request_id=req.request_id)
+
+@app.post("/infer_sync", response_model=InferSyncOut)
+async def infer_sync(req: InferIn, authorization: Optional[str] = Header(default=None)):
+    # (옵션) 백엔드→나 인증
+    if INBOUND_TOKEN:
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Missing bearer token")
+        if authorization.split(" ", 1)[1].strip() != INBOUND_TOKEN:
+            raise HTTPException(status_code=403, detail="Invalid token")
+
+    # 동기 처리 - 결과를 바로 반환
+    results = await _engine.infer_many(
+        req.urls, conf=req.conf, iou=req.iou, imgsz=req.imgsz, concurrency=MAX_CONC
+    )
+    return InferSyncOut(request_id=req.request_id, results=results)
