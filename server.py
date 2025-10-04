@@ -10,10 +10,10 @@ from pydantic import BaseModel, Field, AnyHttpUrl
 from infer_core import InferenceEngine
 from dotenv import load_dotenv
 load_dotenv()  # .env 읽기
-import boto3
 
-# region을 명시해두면 리전 리다이렉트/지연 줄이는 데 도움
-s3 = boto3.client("s3", region_name=os.getenv("AWS_DEFAULT_REGION", "ap-northeast-2"))
+# # S3 직접 연결 (비활성화 - 공개 URL 사용)
+# import boto3
+# s3 = boto3.client("s3", region_name=os.getenv("AWS_DEFAULT_REGION", "ap-northeast-2"))
 # ---------- 환경 설정 ----------
 MODEL_PATH    = os.getenv("MODEL_PATH", "best.pt")
 DEVICE        = os.getenv("DEVICE",  None)

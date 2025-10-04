@@ -21,13 +21,13 @@ services:
       - INBOUND_TOKEN=${INBOUND_TOKEN:-}
       - SHARED_SECRET=${SHARED_SECRET:-}
 
-      # AWS (S3 사용 시)
-      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ap-northeast-2}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
-
       # 기타 설정
       - POST_TIMEOUT=${POST_TIMEOUT:-60}
+
+      # AWS S3 (비활성화 - 공개 URL 사용)
+      # - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ap-northeast-2}
+      # - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      # - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
 
     # 볼륨 마운트 (옵션 - 모델 파일을 외부에서 관리할 경우)
     # volumes:

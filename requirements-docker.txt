@@ -12,7 +12,7 @@ torchvision
 opencv-python-headless
 # Ultralytics (torch는 위에서 이미 설치)
 ultralytics
-# AWS S3
-boto3
+# AWS S3 (비활성화 - 공개 URL 사용)
+# boto3
 python-multipart
 python-dotenv
