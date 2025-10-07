@@ -69,17 +69,21 @@ class InferenceEngine:
     # ---------------- 이미지 로더 ----------------
     async def _load_image(self, src: str) -> Image.Image:
         """
-        src: http(s)://, file://path, 혹은 로컬 경로
+        src: http(s):// 공개 URL 또는 file://path, 로컬 경로
         """
         # file:// 또는 로컬 경로
         if src.startswith("file://") or (not src.startswith("http")):
             path = src[7:] if src.startswith("file://") else src
             return Image.open(path).convert("RGB")
 
-        # http/https
+        # http/https (공개 URL - S3 presigned URL 포함)
         resp = await self.http.get(src)
         resp.raise_for_status()
         return Image.open(io.BytesIO(resp.content)).convert("RGB")
+
+    # # S3 직접 연결 (비활성화 - 공개 URL 사용)
+    # # s3://bucket/key 형식의 직접 접근은 지원하지 않음
+    # # S3 presigned URL 또는 공개 URL을 사용하세요
 
     # ---------------- 라벨 헬퍼 ----------------
     def _label_from_names(self, names, cid: Optional[int]) -> Optional[str]:
